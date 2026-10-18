@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>寻宝奇旅 · JavaScript 异步探险</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23a2362c'/><path d='M7 18h18v5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z' fill='%23f0ddb5'/><path d='M7 18v-3a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v3' fill='none' stroke='%23f0ddb5' stroke-width='2'/><circle cx='16' cy='17' r='1.7' fill='%23a2362c'/></svg>">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* ================= 基础变量与重置 ================= */
+:root{
+  --paper:#f0ddb5;
+  --paper-deep:#e4c98f;
+  --paper-light:#f8eed2;
+  --ink:#3a2a17;
+  --ink-soft:#6b5438;
+  --line:#8a6a3d;
+  --teal:#1d6b66;
+  --teal-deep:#134c48;
+  --gold:#c8902c;
+  --gold-light:#e8b94d;
+  --crimson:#a2362c;
+  --crimson-deep:#7a2019;
+  --green:#4e7d3a;
+  --log-bg:#241a10;
+  --radius:14px;
+  --shadow:0 10px 26px rgba(70,46,18,.22);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+[hidden]{display:none!important;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  font-family:"Noto Serif SC", "Songti SC", "SimSun", serif;
+  color:var(--ink);
+  background:
+    radial-gradient(ellipse at 18% 0%, #f4e6c4 0%, #e7cf9b 46%, #d9bd7e 100%);
+  min-height:100vh;
+  line-height:1.6;
+}
+button{font-family:inherit;}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px;}
+
+.wrap{max-width:1200px;margin:0 auto;padding:22px 18px 46px;}
+
+/* ================= 页头 ================= */
+.masthead{
+  display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;
+  padding-bottom:16px;border-bottom:2px solid rgba(90,60,25,.35);
+}
+.masthead .titles{flex:1;min-width:230px;}
+h1{
+  font-family:"Ma Shan Zheng","Noto Serif SC",serif;
+  font-size:clamp(30px,4.6vw,46px);font-weight:400;line-height:1.15;
+  color:var(--ink);letter-spacing:2px;
+}
+.subtitle{color:var(--ink-soft);font-size:14px;margin-top:6px;letter-spacing:1px;}
+.seal{
+  flex:none;width:64px;height:64px;border-radius:10px;
+  background:var(--crimson);color:#f3e2bd;
+  font-family:"Ma Shan Zheng",serif;font-size:34px;
+  display:flex;align-items:center;justify-content:center;
+  transform:rotate(-6deg);box-shadow:0 4px 10px rgba(122,32,25,.35);
+  border:2px solid rgba(255,240,210,.55);
+}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+.btn{
+  min-height:46px;padding:10px 20px;border-radius:11px;cursor:pointer;
+  font-size:16px;letter-spacing:2px;border:2px solid var(--ink);
+  transition:transform .12s ease, background .15s ease, opacity .15s;
+}
+.btn:active{transform:translateY(2px);}
+.btn-primary{background:var(--crimson);border-color:var(--crimson-deep);color:#f6e9c8;
+  font-family:"Ma Shan Zheng",serif;font-size:21px;box-shadow:0 5px 0 var(--crimson-deep);}
+.btn-primary:hover{background:#b34034;}
+.btn-primary:active{box-shadow:0 2px 0 var(--crimson-deep);}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed;box-shadow:0 5px 0 var(--crimson-deep);}
+.seg{display:inline-flex;border:2px solid var(--ink-soft);border-radius:11px;overflow:hidden;}
+.seg button{
+  border:0;background:transparent;color:var(--ink-soft);padding:9px 14px;
+  min-height:42px;cursor:pointer;font-size:14px;letter-spacing:1px;
+}
+.seg button[aria-pressed="true"]{background:var(--teal);color:#f6e9c8;}
+.icon-btn{
+  width:46px;height:46px;border-radius:11px;border:2px solid var(--ink-soft);
+  background:var(--paper-light);cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:var(--ink);
+}
+.icon-btn[aria-pressed="true"]{background:var(--teal);color:#f6e9c8;border-color:var(--teal-deep);}
+.icon-btn[aria-pressed="false"] .sound-waves{display:none;}
+.icon-btn[aria-pressed="true"] .sound-off{display:none;}
+.icon-btn svg{width:22px;height:22px;}
+
+/* ================= 布局 ================= */
+.layout{display:grid;grid-template-columns:1fr;gap:18px;margin-top:20px;}
+@media (min-width:980px){
+  .layout{grid-template-columns:1.72fr 1fr;}
+  .side{display:grid;grid-template-rows:auto minmax(230px,1fr);gap:18px;align-content:start;}
+}
+.panel{
+  background:linear-gradient(160deg, rgba(255,246,225,.9), rgba(240,221,181,.92));
+  border:2px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.panel-title{
+  font-family:"Ma Shan Zheng",serif;font-size:21px;letter-spacing:3px;
+  padding:10px 16px;border-bottom:1.5px dashed rgba(107,84,56,.5);
+  display:flex;align-items:center;gap:8px;
+}
+.panel-title::before{content:"";width:9px;height:9px;background:var(--crimson);
+  transform:rotate(45deg);display:inline-block;}
+
+/* ================= 藏宝图 ================= */
+.map-panel{padding:8px 8px 2px;}
+.map-panel svg{display:block;width:100%;height:auto;}
+.map-panel::after{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:multiply;z-index:1;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.30 0 0 0 0 0.20 0 0 0 0 0.09 0 0 0 0.05 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.deco{fill:none;stroke:#8a6a3d;stroke-width:2;opacity:.5;stroke-linecap:round;stroke-linejoin:round;}
+.deco-fill{fill:#f3e3b8;stroke:#8a6a3d;stroke-width:2;opacity:.85;}
+.map-title{font-family:"Ma Shan Zheng",serif;font-size:26px;fill:#5b4326;letter-spacing:3px;}
+.route-base{fill:none;stroke:#8a6a3d;stroke-width:5;stroke-dasharray:2 11;stroke-linecap:round;opacity:.6;}
+.route-prog{fill:none;stroke:var(--gold);stroke-width:5.5;stroke-linecap:round;
+  pathLength:100;stroke-dasharray:100;stroke-dashoffset:100;
+  transition:stroke-dashoffset .75s cubic-bezier(.22,1,.36,1);}
+.node{cursor:default;}
+.node .ring{fill:#f6e9c8;stroke:#7b5d36;stroke-width:2.5;transition:fill .3s,stroke .3s;}
+.node .glyph{fill:none;stroke:#7b5d36;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:stroke .3s;}
+.node .nlabel{font-family:"Noto Serif SC",serif;font-size:16px;font-weight:700;
+  fill:#4a3720;text-anchor:middle;paint-order:stroke;stroke:#f0ddb5;stroke-width:4px;}
+.node .pulse{fill:var(--gold);opacity:0;transform-box:fill-box;transform-origin:center;}
+.node .badge{opacity:0;transition:opacity .25s;}
+.node .badge circle{fill:var(--gold);stroke:#3a2a17;stroke-width:1.5;}
+.node .badge path{fill:none;stroke:#3a2a17;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
+.node .badge .cross{display:none;}
+.node[data-state="fail"] .badge .check{display:none;}
+.node[data-state="fail"] .badge .cross{display:block;}
+.node[data-state="active"] .ring{fill:var(--gold-light);stroke:#3a2a17;}
+.node[data-state="active"] .glyph{stroke:#3a2a17;}
+.node[data-state="active"] .pulse{animation:nodePulse 1.25s ease-out infinite;}
+@keyframes nodePulse{from{transform:scale(.9);opacity:.75;}to{transform:scale(1.55);opacity:0;}}
+.node[data-state="done"] .ring{fill:var(--teal);stroke:var(--teal-deep);}
+.node[data-state="done"] .glyph{stroke:#f6e9c8;}
+.node[data-state="done"] .badge{opacity:1;}
+.node[data-state="skip"] .ring{fill:#ddcba3;stroke:#9b8862;stroke-dasharray:4 3;}
+.node[data-state="skip"] .glyph{stroke:#9b8862;}
+.node[data-state="skip"] .badge{opacity:1;}
+.node[data-state="skip"] .badge circle{fill:#9b8862;}
+.node[data-state="fail"] .ring{fill:var(--crimson);stroke:var(--crimson-deep);}
+.node[data-state="fail"] .glyph{stroke:#f6e9c8;}
+.node[data-state="fail"] .badge{opacity:1;}
+.node[data-state="fail"] .badge circle{fill:var(--crimson);}
+.node[data-state="fail"] .badge path{stroke:#f6e9c8;}
+.explorer{transition:transform .75s cubic-bezier(.22,1,.36,1);}
+.explorer .bob{animation:bob 1.1s ease-in-out infinite;transform-origin:center;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
+.needle{transform-box:fill-box;transform-origin:center;animation:spin 36s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.confetti-layer{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2;}
+.confetti-layer .piece{position:absolute;top:34%;width:9px;height:9px;border-radius:2px;
+  --x:0px;--r:0deg;opacity:0;
+  animation:confettiFall 2.6s ease-in forwards;}
+@keyframes confettiFall{
+  0%{opacity:1;transform:translate(0,0) rotate(0) scale(1);}
+  100%{opacity:0;transform:translate(var(--x),380px) rotate(var(--r)) scale(.7);}
+}
+
+/* ================= 当前驿站卡片 ================= */
+.stage-card{padding:14px 16px 16px;}
+.stage-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.stage-no{
+  font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:700;
+  background:var(--ink);color:var(--paper-light);padding:3px 9px;border-radius:999px;letter-spacing:1px;
+}
+.stage-name{font-family:"Ma Shan Zheng",serif;font-size:24px;letter-spacing:2px;}
+.scene{display:flex;gap:14px;align-items:center;margin-top:12px;}
+.emblem{
+  flex:none;width:92px;height:92px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #fbf2da, #e3c98f);
+  border:2.5px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--ink);box-shadow:inset 0 0 14px rgba(120,80,30,.25);
+}
+.emblem svg{width:52px;height:52px;}
+.emblem.running{background:radial-gradient(circle at 35% 30%, #f3d27a, #d99a33);animation:emblemSpin 1.6s ease-in-out infinite;}
+.emblem.good{background:radial-gradient(circle at 35% 30%, #bfe0c4, #7eaa69);color:#173a1a;}
+.emblem.bad{background:radial-gradient(circle at 35% 30%, #e6a09a, #b34a3e);color:#fff;}
+@keyframes emblemSpin{0%,100%{transform:rotate(-3deg) scale(1);}50%{transform:rotate(3deg) scale(1.05);}}
+.stage-msg{font-size:14.5px;color:var(--ink);}
+.stage-msg .dim{color:var(--ink-soft);}
+
+/* 猜拳 */
+.rps{margin-top:14px;border-top:1.5px dashed rgba(107,84,56,.45);padding-top:12px;}
+.rps-tip{font-size:14px;color:var(--crimson-deep);font-weight:700;margin-bottom:10px;}
+.versus{display:flex;align-items:center;justify-content:space-around;gap:8px;margin-bottom:8px;}
+.hand{
+  width:92px;height:92px;border-radius:14px;border:2px solid var(--line);
+  background:#f6e9c8;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;color:var(--ink-soft);font-size:12px;
+}
+.hand svg{width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
+.hand .hand-name{font-size:15px;font-weight:700;color:var(--ink);min-height:20px;}
+.hand.guard-reveal{border-color:var(--crimson);color:var(--crimson);animation:shake .4s ease;}
+.hand.player-pick{border-color:var(--teal);color:var(--teal);}
+.vs{font-family:"Ma Shan Zheng",serif;font-size:22px;color:var(--ink-soft);}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+.rounds{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+.rounds i{width:11px;height:11px;border-radius:50%;background:#cfb687;border:1px solid #a0824e;}
+.rounds i.lost{background:var(--crimson);}
+.rps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.rps-btn{
+  min-height:72px;border:2px solid var(--line);border-radius:12px;cursor:pointer;
+  background:#f6e9c8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:var(--ink);transition:background .12s,transform .12s,border-color .12s;
+}
+.rps-btn:hover:not(:disabled){background:#fff4d8;border-color:var(--gold);}
+.rps-btn:disabled{opacity:.5;cursor:not-allowed;}
+.rps-btn svg{width:30px;height:30px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
+.rps-btn span{font-size:14px;font-weight:700;}
+
+/* 锁 */
+.locks{margin-top:14px;border-top:1.5px dashed rgba(107,84,56,.45);padding-top:12px;
+  display:flex;gap:9px;justify-content:center;}
+.lock-chip{
+  flex:1;max-width:130px;text-align:center;padding:9px 6px;border-radius:999px;
+  border:2px solid #a0824e;background:#e6d3aa;color:#8a6a3d;font-size:14px;font-weight:700;
+  transition:all .3s;}
+.lock-chip small{display:block;font-weight:400;font-size:11px;}
+.lock-chip.unlocked{background:linear-gradient(160deg,#f3d27a,#d99a33);border-color:var(--gold);color:#3a2a17;
+  transform:scale(1.05);box-shadow:0 3px 10px rgba(200,144,44,.45);}
+
+/* 结局横幅 */
+.banner{margin-top:14px;border-radius:12px;padding:16px;text-align:center;display:none;}
+.banner.show{display:block;animation:bannerIn .5s ease;}
+@keyframes bannerIn{from{transform:scale(.92);opacity:0;}to{transform:scale(1);opacity:1;}}
+.banner.win{background:linear-gradient(160deg,#f3d27a,#d99a33);border:2px solid #a8741e;color:#3a2a17;}
+.banner.lose{background:linear-gradient(160deg,#d98a82,#a2362c);border:2px solid var(--crimson-deep);color:#fbeee0;}
+.banner .b-title{font-family:"Ma Shan Zheng",serif;font-size:27px;letter-spacing:2px;}
+.banner .b-msg{font-size:14px;margin-top:4px;}
+.banner .b-gem{width:56px;height:56px;margin:0 auto 6px;}
+
+/* ================= 日志 ================= */
+.log-panel{display:flex;flex-direction:column;min-height:240px;}
+.log-body{
+  background:var(--log-bg);color:#ecd9ab;border-radius:0 0 12px 12px;
+  font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.55;
+  padding:12px 14px;flex:1;min-height:200px;max-height:340px;overflow-y:auto;
+}
+.log-line{padding:2px 0 2px 16px;position:relative;animation:logIn .3s ease;}
+@keyframes logIn{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:none;}}
+.log-line::before{content:"";position:absolute;left:2px;top:11px;width:7px;height:7px;
+  border-radius:2px;background:var(--gold);transform:rotate(45deg);}
+.log-line.ok{color:#a9d68a;}.log-line.ok::before{background:var(--green);}
+.log-line.warn{color:#f0c674;}.log-line.warn::before{background:var(--gold-light);}
+.log-line.err{color:#f0968a;}.log-line.err::before{background:var(--crimson);}
+.log-line.sys{color:#8fa7ad;}.log-line.sys::before{background:#5f8a92;}
+.log-cursor{display:inline-block;width:8px;height:14px;background:#e8b94d;vertical-align:-2px;
+  animation:blink 1s steps(1) infinite;}
+@keyframes blink{50%{opacity:0;}}
+
+/* ================= 代码区 ================= */
+.code-section{margin-top:20px;}
+.code-section summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;
+  padding:14px 18px;font-family:"Ma Shan Zheng",serif;font-size:20px;letter-spacing:2px;
+}
+.code-section summary::-webkit-details-marker{display:none;}
+.code-section summary .arrow{transition:transform .2s;margin-left:auto;color:var(--ink-soft);}
+.code-section[open] summary .arrow{transform:rotate(90deg);}
+.code-wrap{padding:0 16px 18px;}
+.code-wrap pre{
+  background:var(--log-bg);color:#e7d6b4;border-radius:12px;padding:16px 18px;
+  overflow-x:auto;font-family:"JetBrains Mono",monospace;font-size:12.8px;line-height:1.7;
+}
+.tk-com{color:#8fa78c;font-style:italic;}
+.tk-str{color:#e8b986;}
+.tk-kw{color:#8fc7c2;font-weight:700;}
+.tk-num{color:#d19a9a;}
+.points{
+  display:grid;grid-template-columns:1fr;gap:10px;margin:14px 2px 0;
+}
+@media(min-width:720px){.points{grid-template-columns:repeat(3,1fr);}}
+.point{
+  border:2px solid var(--line);border-radius:11px;padding:10px 13px;background:rgba(255,246,225,.7);
+  font-size:13.5px;
+}
+.point b{color:var(--teal-deep);}
+.foot{margin-top:22px;text-align:center;color:var(--ink-soft);font-size:12.5px;letter-spacing:1px;}
+
+@media (prefers-reduced-motion: reduce){
+  .bob,.needle,.pulse,.emblem.running{animation:none!important;}
+  .explorer,.route-prog,.lock-chip{transition:none!important;}
+  .confetti-layer .piece{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ===== 页头 ===== -->
+  <header class="masthead">
+    <div class="titles">
+      <h1>寻宝奇旅 · JavaScript 异步探险</h1>
+      <p class="subtitle">实验二：用 Promise 与 async/await 编排一段会失败、会分支的寻宝旅程</p>
+    </div>
+    <div class="seal" aria-hidden="true">宝</div>
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">开始寻宝</button>
+      <div class="seg" role="group" aria-label="播放速度">
+        <button id="speed1" aria-pressed="true">标准</button>
+        <button id="speed2" aria-pressed="false">快进</button>
+      </div>
+      <button class="icon-btn" id="soundBtn" aria-pressed="false" aria-label="切换音效" title="切换音效">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12" class="sound-waves"/>
+          <path d="M4 4l16 16" class="sound-off"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== 主布局 ===== -->
+  <main class="layout">
+    <!-- 藏宝图 -->
+    <section class="panel map-panel" aria-label="寻宝路线图">
+      <svg id="map" viewBox="0 0 920 560" role="img" aria-label="从图书馆到宝藏的寻宝路线图">
+        <defs>
+          <linearGradient id="seaGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#e9d5a2"/><stop offset="1" stop-color="#d8bc7e"/>
+          </linearGradient>
+        </defs>
+        <rect x="10" y="10" width="900" height="540" rx="16" fill="url(#seaGrad)" opacity=".35"/>
+        <text class="map-title" x="36" y="52">藏宝图</text>
+
+        <!-- 装饰：山峦、树丛、水波 -->
+        <g class="deco">
+          <path d="M52 300 l24 -40 14 24 16 -30 30 46 z"/>
+          <path d="M80 252 l-6 10 M76 260 l-6 10"/>
+          <path d="M838 452 l20 -34 12 20 14 -26 26 40 z"/>
+          <path d="M560 70 l16 -26 10 16 12 -20 22 30 z"/>
+          <path d="M520 300 q10 -10 20 0 t20 0 M520 312 q10 -10 20 0 t20 0 M520 324 q10 -10 20 0 t20 0" opacity=".6"/>
+          <path d="M120 180 q10 -10 20 0 t20 0 M120 192 q10 -10 20 0 t20 0" opacity=".4"/>
+        </g>
+        <g class="deco" id="miniTrees"></g>
+
+        <!-- 罗盘 -->
+        <g transform="translate(856,68)">
+          <circle class="deco-fill" r="30"/>
+          <g class="needle">
+            <path d="M0 -23 L5 0 L0 23 L-5 0 Z" fill="#a2362c" stroke="none" opacity=".85"/>
+            <path d="M0 -23 L5 0 L0 0 Z" fill="#7a2019" stroke="none"/>
+          </g>
+          <circle r="4" fill="#5b4326" stroke="none"/>
+          <text x="0" y="-36" text-anchor="middle" font-family="Ma Shan Zheng,serif" font-size="15" fill="#5b4326">北</text>
+        </g>
+
+        <!-- 路线 -->
+        <path class="route-base" d="M100 470 C160 430 220 410 270 395 C330 380 380 465 440 465 C500 465 560 410 620 388 C680 366 730 320 782 292 C740 250 700 200 648 172 C580 138 500 128 420 128 C340 128 250 110 170 106"/>
+        <path class="route-prog" id="routeProg" d="M100 470 C160 430 220 410 270 395 C330 380 380 465 440 465 C500 465 560 410 620 388 C680 366 730 320 782 292 C740 250 700 200 648 172 C580 138 500 128 420 128 C340 128 250 110 170 106"/>
+
+        <!-- 节点（JS 生成） -->
+        <g id="nodeLayer"></g>
+
+        <!-- 探险者 -->
+        <g id="explorer" class="explorer">
+          <g class="bob">
+            <ellipse cx="0" cy="18" rx="10" ry="3" fill="rgba(50,35,15,.35)" stroke="none"/>
+            <rect x="-4.6" y="8" width="3.6" height="9" rx="1.8" fill="#22333b"/>
+            <rect x="1" y="8" width="3.6" height="9" rx="1.8" fill="#22333b"/>
+            <path d="M-7 -1 c0 -7 3 -9 7 -9 s7 2 7 9 v9 h-14 z" fill="#344b54"/>
+            <circle cx="0" cy="-11" r="5" fill="#e9c9a0"/>
+            <path d="M-10.5 -12.5 q10.5 -5 21 0 z" fill="#22333b"/>
+            <path d="M-5 -12.5 q5 -7 10 0 z" fill="#22333b"/>
+            <path d="M5.5 -6 q2 3 1 7" fill="none" stroke="#344b54" stroke-width="2.4"/>
+          </g>
+        </g>
+      </svg>
+      <div class="confetti-layer" id="confetti"></div>
+    </section>
+
+    <!-- 右侧：驿站卡 + 日志 -->
+    <div class="side">
+      <section class="panel stage-card" aria-live="polite">
+        <div class="panel-title">当前驿站</div>
+        <div class="stage-head" style="margin-top:10px;">
+          <span class="stage-no" id="stageNo">待机</span>
+          <span class="stage-name" id="stageName">寻宝尚未开始</span>
+        </div>
+        <div class="scene">
+          <div class="emblem" id="emblem"></div>
+          <p class="stage-msg" id="stageMsg">点击「开始寻宝」，从古老图书馆出发，一路解谜、渡河、智斗守卫，找到传说中的宝藏。</p>
+        </div>
+        <div class="rps" id="rps" hidden>
+          <p class="rps-tip">守卫拦路！三局之内猜拳获胜方可通过，平局重赛。</p>
+          <div class="versus">
+            <div class="hand" id="guardHand">
+              <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/></svg>
+              <span class="hand-name">守卫</span>
+            </div>
+            <span class="vs">VS</span>
+            <div class="hand" id="playerHand">
+              <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/></svg>
+              <span class="hand-name">你</span>
+            </div>
+          </div>
+          <div class="rounds" id="rounds" aria-label="剩余回合"></div>
+          <div class="rps-grid">
+            <button class="rps-btn" data-move="石头" aria-label="出石头">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span>石头</span>
+            </button>
+            <button class="rps-btn" data-move="剪刀" aria-label="出剪刀">
+              <svg viewBox="0 0 24 24"><circle cx="7" cy="17" r="3.2"/><circle cx="17" cy="17" r="3.2"/><path d="M7 14 L3 4 M17 14 L21 4"/></svg><span>剪刀</span>
+            </button>
+            <button class="rps-btn" data-move="布" aria-label="出布">
+              <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/></svg><span>布</span>
+            </button>
+          </div>
+        </div>
+        <div class="locks" id="locks" hidden>
+          <div class="lock-chip" data-lock="铜锁">铜锁<small>第一道</small></div>
+          <div class="lock-chip" data-lock="银锁">银锁<small>第二道</small></div>
+          <div class="lock-chip" data-lock="金锁">金锁<small>第三道</small></div>
+        </div>
+        <div class="banner" id="banner"></div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-title">探险日志</div>
+        <div class="log-body" id="logBody">
+          <div class="log-line sys">探险系统就绪，等待出发指令…</div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <!-- ===== 代码展示 ===== -->
+  <details class="panel code-section" id="codePanel">
+    <summary class="panel-title">查看 async/await 实现代码 <span class="arrow">▶</span></summary>
+    <div class="code-wrap">
+      <pre><code id="codeOut"></code></pre>
+      <div class="points">
+        <div class="point"><b>每个驿站都是一个 Promise</b>：用 setTimeout 模拟网络/API 延迟，API 方法全部用 async 定义。</div>
+        <div class="point"><b>await 顺序编排</b>：await 等待上一步结果，再进入下一步，代码读起来和同步流程一样清晰。</div>
+        <div class="point"><b>try/catch 处理分支</b>：遇到守卫会 reject，内层 catch 转入猜拳；猜拳三连败才真正失败。</div>
+      </div>
+    </div>
+  </details>
+
+  <p class="foot">实验二 · JavaScript 异步之寻宝 ｜ Promise 链 → async/await 重写 ｜ 随机分支与异常处理</p>
+</div>
+
+<!-- ===== 待展示的 async/await 源码（Node 可运行版） ===== -->
+<script type="text/plain" id="asyncSrc">// 统一的异步等待工具
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// 模拟宝藏地图 API（全部方法返回 Promise，用 async 定义）
+class TreasureMap {
+  // 第 1 站：古老图书馆找线索
+  static async getInitialClue() {
+    await sleep(1000);
+    return '在古老的图书馆里找到了第一个线索...';
+  }
+
+  // 第 2 站：解码古老经文
+  static async decodeAncientScript(clue) {
+    await sleep(1500);
+    if (!clue) {
+      throw new Error('没有线索可以解码!');
+    }
+    return '解码成功!宝藏在一座古老的神庙中...';
+  }
+
+  // 第 3 站（新增）：穿越迷雾森林，35% 概率迷路，重新找路后继续
+  static async crossMistyForest() {
+    await sleep(1200);
+    if (Math.random() < 0.35) {
+      await sleep(900);
+      return '迷雾中一度迷路，你顺着指南针重新找到了小径...';
+    }
+    return '穿过迷雾森林，发现一条通往深山的隐秘小径...';
+  }
+
+  // 第 4 站（新增）：等待老船夫撑船靠岸，渡过急流
+  static async crossRiverByBoat() {
+    await sleep(1500);
+    return '老船夫撑着木船靠岸，你渡过了湍急的河流...';
+  }
+
+  // 第 5 站：搜寻神庙，50% 概率撞见守卫（reject -> throw）
+  static async searchTemple() {
+    await sleep(2000);
+    if (Math.random() < 0.5) {
+      throw new Error('糟糕!遇到了神庙守卫!');
+    }
+    return '神庙里空无一人，你径直找到了一个神秘的箱子...';
+  }
+
+  // 第 6 站（新增）：与守卫猜拳，赢一局即通过；平局重赛；输三局则失败
+  static async challengeGuard() {
+    const moves = ['石头', '剪刀', '布'];
+    const beats = { 石头: '剪刀', 剪刀: '布', 布: '石头' };
+    let round = 1;
+    while (round <= 3) {
+      await sleep(800);
+      const player = moves[Math.floor(Math.random() * 3)];
+      const guard = moves[Math.floor(Math.random() * 3)];
+      console.log(`第${round}回合：你出「${player}」，守卫出「${guard}」`);
+      if (player === guard) {
+        await sleep(400);
+        console.log('平局，本回合重赛...');
+        continue; // 平局不消耗回合
+      }
+      if (beats[player] === guard) {
+        return `第${round}回合猜拳获胜，守卫拱手让路，你进入了神庙深处...`;
+      }
+      console.log('本回合失利...');
+      round++;
+    }
+    throw new Error('三次猜拳均告失利，守卫把你请下了神山...');
+  }
+
+  // 第 7 站：铜、银、金三道锁依次打开，宝箱现世
+  static async openTreasureBox() {
+    for (const lockName of ['铜锁', '银锁', '金锁']) {
+      await sleep(600);
+      console.log(`咔哒！${lockName}打开了`);
+    }
+    await sleep(800);
+    return '恭喜!你找到了传说中的宝藏!';
+  }
+}
+
+// 寻宝主流程：async/await + try/catch 顺序编排
+async function findTreasure() {
+  try {
+    const clue = await TreasureMap.getInitialClue();
+    console.log(clue);
+
+    const location = await TreasureMap.decodeAncientScript(clue);
+    console.log(location);
+
+    const forest = await TreasureMap.crossMistyForest();
+    console.log(forest);
+
+    const river = await TreasureMap.crossRiverByBoat();
+    console.log(river);
+
+    // 守卫分支：searchTemple 抛出的异常被内层捕获，转入猜拳环节
+    let boxMessage;
+    try {
+      boxMessage = await TreasureMap.searchTemple();
+    } catch (guardError) {
+      console.log(guardError.message);
+      boxMessage = await TreasureMap.challengeGuard();
+    }
+    console.log(boxMessage);
+
+    const treasure = await TreasureMap.openTreasureBox();
+    console.log(treasure);
+  } catch (error) {
+    console.error('任务失败:', error.message);
+  }
+}
+
+findTreasure();</script>
+
+<script>
+/* ============================================================
+   页面版寻宝逻辑：与 Node 版语义一致，
+   区别仅在等待时间受速度开关影响、猜拳改为等待玩家点击
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+
+// ---------- 驿站与图标 ----------
+const ICONS = {
+  book:   '<path d="M-12 -6 C-8 -10 -4 -9 0 -7 C4 -9 8 -10 12 -6 L12 10 C8 6 4 7 0 9 C-4 7 -8 6 -12 10 Z M0 -7 V9"/>',
+  scroll: '<path d="M-10 -9 h12 a4 4 0 0 1 4 4 v8 a4 4 0 0 1 -4 4 h-12 z M-10 -9 v16 M-5 -3 h7 M-5 2 h7 M-5 7 h4"/>',
+  tree:   '<path d="M-10 10 L-2 10 L-2 13.5 H2 L2 10 L10 10 L4.5 2 H8 L0 -9 L-8 2 H-4.5 Z"/>',
+  river:  '<path d="M-12 -3 q4 -5 8 0 t8 0 M-12 5 q4 -5 8 0 t8 0 M-12 13 q4 -5 8 0 t8 0"/>',
+  temple: '<path d="M-13 -5 L0 -12 L13 -5 Z M-15 -5 H15 M-9 -1 V9 M-3 -1 V9 M3 -1 V9 M9 -1 V9 M-12 9 H12 M-13 13 H13"/>',
+  guard:  '<path d="M0 -11 L10 -7 V2 C10 8 5 11.5 0 13 C-5 11.5 -10 8 -10 2 V-7 Z M0 -4 V3 M0 6.4 h0.01"/>',
+  chest:  '<path d="M-12 -1 V6 a3 3 0 0 0 3 3 H9 a3 3 0 0 0 3 -3 V-1 Z M-12 -1 V-4 a4 4 0 0 1 4 -4 H8 a4 4 0 0 1 4 4 V-1 M-12 -1 H12 M0 -1 V9"/>',
+  chestOpen: '<path d="M-12 -1 V6 a3 3 0 0 0 3 3 H9 a3 3 0 0 0 3 -3 V-1 M-12 -1 C-12 -9 -6 -11 0 -11 C6 -11 12 -9 12 -1 M-12 -1 H12 M0 -1 V9"/>',
+  gem:    '<path d="M-6 -10 H6 L12 -2 L0 13 L-12 -2 Z M-12 -2 H12 M-6 -10 L-12 -2 L0 13 L12 -2 L6 -10"/>'
+};
+const STAGES = [
+  { name:'古老图书馆', icon:'book',   coord:[100,470],  hint:'在积灰的书架间翻找第一张线索…' },
+  { name:'解码古卷',   icon:'scroll', coord:[270,395],  hint:'解读经文上的古老符号…' },
+  { name:'迷雾森林',   icon:'tree',   coord:[440,465],  hint:'浓雾弥漫，只能凭指南针辨认方向…' },
+  { name:'急流古渡',   icon:'river',  coord:[620,388],  hint:'河水湍急，等待老船夫撑船靠岸…' },
+  { name:'古老神庙',   icon:'temple', coord:[782,292],  hint:'神殿幽深，前方似乎有什么动静…' },
+  { name:'守卫试炼',   icon:'guard',  coord:[648,172],  hint:'守卫挡住去路，需要猜拳决胜…' },
+  { name:'神秘宝箱',   icon:'chest',  coord:[420,128],  hint:'铜、银、金三道锁依次开启…' },
+  { name:'传说宝藏',   icon:'gem',    coord:[170,106],  hint:'宝箱缓缓开启，金光涌出…' }
+];
+
+// ---------- 构建地图节点与装饰 ----------
+const nodeLayer = $('nodeLayer');
+nodeLayer.innerHTML = STAGES.map((s, i) =>
+  '<g class="node" data-index="' + i + '" data-state="locked" transform="translate(' + s.coord[0] + ',' + s.coord[1] + ')">'
+  + '<circle class="pulse" r="26"/>'
+  + '<circle class="ring" r="26"/>'
+  + '<g class="glyph">' + ICONS[s.icon] + '</g>'
+  + '<g class="badge"><circle cx="20" cy="-22" r="10"/><path class="check" d="M15 -22 l3.5 3.5 l6.5 -7"/><path class="cross" d="M15.5 -26.5 L24.5 -17.5 M24.5 -26.5 L15.5 -17.5"/></g>'
+  + '<text class="nlabel" y="52">' + s.name + '</text></g>'
+).join('');
+const nodes = Array.from(nodeLayer.children);
+const miniTrees = $('miniTrees');
+const TREE_POS = [[230,470],[300,520],[520,500],[560,470],[720,250],[760,160],[470,80],[250,70],[330,180]];
+miniTrees.innerHTML = TREE_POS.map(function (p, i) {
+  return '<path transform="translate(' + p[0] + ',' + p[1] + ') scale(' + (i % 2 ? 0.7 : 0.95) + ')" d="M-7 8 L-1.5 8 L-1.5 11 H1.5 L1.5 8 L7 8 L3 2 H5.5 L0 -7 L-5.5 2 H-3 Z"/>';
+}).join('');
+
+const routeProg = $('routeProg');
+const explorer = $('explorer');
+const routeLen = routeProg.getTotalLength();
+explorer.setAttribute('transform', 'translate(' + STAGES[0].coord[0] + ',' + STAGES[0].coord[1] + ')');
+
+// ---------- 音效（默认关闭，需用户手动开启） ----------
+const Sound = {
+  ctx: null, on: false,
+  init: function () {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { try { this.ctx = new AC(); } catch (e) { this.ctx = null; } }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') { this.ctx.resume(); }
+  },
+  tone: function (f, d, type, delay, g) {
+    if (!this.on || !this.ctx) { return; }
+    const t0 = this.ctx.currentTime + (delay || 0);
+    const o = this.ctx.createOscillator();
+    const v = this.ctx.createGain();
+    o.type = type || 'sine'; o.frequency.value = f;
+    v.gain.setValueAtTime(0.0001, t0);
+    v.gain.exponentialRampToValueAtTime(g || 0.12, t0 + 0.02);
+    v.gain.exponentialRampToValueAtTime(0.0001, t0 + (d || 0.12));
+    o.connect(v); v.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0 + (d || 0.12) + 0.05);
+  },
+  step:  function () { this.tone(440, 0.09, 'triangle', 0, 0.08); },
+  chime: function () { this.tone(523, 0.1); this.tone(784, 0.14, 'sine', 0.09, 0.1); },
+  click: function () { this.tone(680, 0.05, 'square', 0, 0.04); },
+  lock:  function () { this.tone(880, 0.07, 'triangle', 0, 0.1); this.tone(1175, 0.1, 'triangle', 0.07, 0.08); },
+  guard: function () { this.tone(200, 0.18, 'sawtooth', 0, 0.06); this.tone(150, 0.25, 'sawtooth', 0.12, 0.06); },
+  win:   function () { [523, 659, 784, 1047].forEach(function (f, i) { this.tone(f, 0.18, 'sine', i * 0.13, 0.12); }, this); },
+  fail:  function () { this.tone(300, 0.2, 'sawtooth', 0, 0.07); this.tone(220, 0.25, 'sawtooth', 0.15, 0.07); this.tone(150, 0.4, 'sawtooth', 0.32, 0.07); }
+};
+
+// ---------- 通用工具 ----------
+let speedFactor = 1;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms) => sleep(Math.round(ms * speedFactor));
+let running = false, runToken = 0, currentStage = -1;
+const alive = (t) => t === runToken;
+
+// ---------- 日志 ----------
+const logBody = $('logBody');
+const cursorLine = '<div class="log-line sys" id="logCursor"><span class="log-cursor"></span></div>';
+function log(msg, type) {
+  const line = document.createElement('div');
+  line.className = 'log-line ' + (type || '');
+  line.textContent = msg;
+  const old = $('logCursor');
+  if (old) { old.remove(); }
+  logBody.appendChild(line);
+  logBody.appendChild(document.createRange().createContextualFragment(cursorLine));
+  logBody.scrollTop = logBody.scrollHeight;
+}
+
+// ---------- 驿站 UI ----------
+const stageNo = $('stageNo'), stageName = $('stageName'),
+      stageMsg = $('stageMsg'), emblem = $('emblem');
+function setEmblem(icon, cls) {
+  emblem.className = 'emblem' + (cls ? ' ' + cls : '');
+  emblem.innerHTML = '<svg viewBox="-16 -16 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + '</svg>';
+}
+function travelTo(i) {
+  const pt = routeProg.getPointAtLength((i / (STAGES.length - 1)) * routeLen);
+  explorer.style.transform = 'translate(' + pt.x + 'px,' + pt.y + 'px)';
+  routeProg.style.strokeDashoffset = String(100 - (i / (STAGES.length - 1)) * 100);
+}
+function setNode(i, state) { nodes[i].dataset.state = state; }
+function beginStage(i, msg) {
+  currentStage = i;
+  setNode(i, 'active');
+  travelTo(i);
+  stageNo.textContent = '第 ' + (i + 1) + ' 站';
+  stageName.textContent = STAGES[i].name;
+  stageMsg.innerHTML = msg;
+  setEmblem(STAGES[i].icon, 'running');
+  Sound.step();
+}
+function finishStage(i) {
+  setNode(i, 'done');
+  Sound.chime();
+}
+
+// ---------- 猜拳交互 ----------
+const rpsBox = $('rps'), guardHand = $('guardHand'), playerHand = $('playerHand'),
+      roundsEl = $('rounds'), rpsButtons = Array.from(document.querySelectorAll('.rps-btn'));
+const MOVES = ['石头', '剪刀', '布'];
+const HAND_GLYPH = {
+  '石头': '<circle cx="12" cy="12" r="9"/>',
+  '布': '<rect x="4" y="3" width="16" height="18" rx="3"/>',
+  '剪刀': '<circle cx="7" cy="17" r="3.2"/><circle cx="17" cy="17" r="3.2"/><path d="M7 14 L3 4 M17 14 L21 4"/>'
+};
+function handHTML(role, glyph, move) {
+  return '<small class="hand-role" style="font-size:11px;color:#8a6a3d">' + role + '</small>'
+    + '<svg viewBox="0 0 24 24">' + glyph + '</svg>'
+    + '<span class="hand-name">' + move + '</span>';
+}
+function resetHands() {
+  const q = '<circle cx="12" cy="12" r="9"/><text x="12" y="17" text-anchor="middle" font-size="14" fill="currentColor" stroke="none" font-weight="700">?</text>';
+  guardHand.className = 'hand';
+  playerHand.className = 'hand';
+  guardHand.innerHTML = handHTML('守卫', q, '待出');
+  playerHand.innerHTML = handHTML('你', q, '请出招');
+}
+function setRounds(remaining) {
+  roundsEl.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const dot = document.createElement('i');
+    if (i >= remaining) { dot.className = 'lost'; }
+    roundsEl.appendChild(dot);
+  }
+}
+const RPS = { resolver: null, lock: false };
+function rpsPlay() {
+  return new Promise(function (resolve) { RPS.resolver = resolve; });
+}
+function judge(p, g) {
+  if (p === g) { return 0; }
+  if ((p === '石头' && g === '剪刀') || (p === '剪刀' && g === '布') || (p === '布' && g === '石头')) { return 1; }
+  return 2;
+}
+rpsButtons.forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    if (!RPS.resolver || RPS.lock) { return; }
+    RPS.lock = true;
+    Sound.click();
+    const player = btn.dataset.move;
+    const guard = MOVES[Math.floor(Math.random() * 3)];
+    playerHand.className = 'hand player-pick';
+    playerHand.innerHTML = handHTML('你', HAND_GLYPH[player], player);
+    guardHand.className = 'hand guard-reveal';
+    guardHand.innerHTML = handHTML('守卫', HAND_GLYPH[guard], guard);
+    rpsButtons.forEach(function (b) { b.blur(); });
+    RPS.resolver({ player: player, guard: guard, res: judge(player, guard) });
+    RPS.resolver = null;
+  });
+});
+document.addEventListener('keydown', function (e) {
+  if (rpsBox.hidden || !RPS.resolver) { return; }
+  const map = { '1': '石头', '2': '剪刀', '3': '布' };
+  if (map[e.key]) {
+    rpsButtons.find(function (b) { return b.dataset.move === map[e.key]; }).click();
+  }
+});
+
+// ---------- 页面版 TreasureMap API ----------
+const MapAPI = {
+  async getInitialClue() {
+    await wait(1000);
+    return '在古老的图书馆里找到了第一个线索...';
+  },
+  async decodeAncientScript(clue) {
+    await wait(1500);
+    if (!clue) { throw new Error('没有线索可以解码!'); }
+    return '解码成功!宝藏在一座古老的神庙中...';
+  },
+  async crossMistyForest() {
+    await wait(1200);
+    if (Math.random() < 0.35) {
+      await wait(900);
+      return { lost: true, msg: '迷雾中一度迷路，你顺着指南针重新找到了小径...' };
+    }
+    return { lost: false, msg: '穿过迷雾森林，发现一条通往深山的隐秘小径...' };
+  },
+  async crossRiverByBoat() {
+    await wait(1500);
+    return '老船夫撑着木船靠岸，你渡过了湍急的河流...';
+  },
+  async searchTemple() {
+    await wait(2000);
+    if (Math.random() < 0.5) { throw new Error('糟糕!遇到了神庙守卫!'); }
+    return '神庙里空无一人，你径直找到了一个神秘的箱子...';
+  },
+  async challengeGuard(my) {
+    const beats = { '石头': '剪刀', '剪刀': '布', '布': '石头' };
+    let round = 1;
+    while (round <= 3) {
+      if (!alive(my)) { throw new Error('探险已取消'); }
+      setRounds(4 - round);
+      const r = await rpsPlay();
+      RPS.lock = false;
+      log('第' + round + '回合：你出「' + r.player + '」，守卫出「' + r.guard + '」');
+      await wait(950);
+      if (!alive(my)) { throw new Error('探险已取消'); }
+      if (r.res === 0) {
+        log('平局，本回合重赛…', 'warn');
+        await wait(500);
+        resetHands();
+        continue;
+      }
+      if (r.res === 1) {
+        return '第' + round + '回合猜拳获胜，守卫拱手让路，你进入了神庙深处...';
+      }
+      log('第' + round + '回合失利，守卫纹丝不动…', 'err');
+      Sound.guard();
+      round++;
+      if (round <= 3) { await wait(600); resetHands(); }
+    }
+    throw new Error('三次猜拳均告失利，守卫把你请下了神山...');
+  },
+  async openTreasureBox(my, onLock) {
+    for (const lockName of ['铜锁', '银锁', '金锁']) {
+      await wait(600);
+      if (!alive(my)) { throw new Error('探险已取消'); }
+      if (onLock) { onLock(lockName); }
+    }
+    await wait(800);
+    return '恭喜!你找到了传说中的宝藏!';
+  }
+};
+
+// ---------- 彩带 ----------
+function confetti() {
+  const layer = $('confetti');
+  layer.innerHTML = '';
+  const colors = ['#c8902c', '#e8b94d', '#a2362c', '#1d6b66', '#4e7d3a', '#f0ddb5'];
+  for (let i = 0; i < 64; i++) {
+    const p = document.createElement('i');
+    p.className = 'piece';
+    p.style.left = (6 + Math.random() * 88) + '%';
+    p.style.background = colors[i % colors.length];
+    p.style.setProperty('--x', (Math.random() * 260 - 130) + 'px');
+    p.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg');
+    p.style.animationDelay = (Math.random() * 0.9) + 's';
+    p.style.animationDuration = (2.2 + Math.random() * 1.8) + 's';
+    layer.appendChild(p);
+  }
+  setTimeout(function () { layer.innerHTML = ''; }, 5500);
+}
+
+// ---------- 结局 ----------
+function showWin(msg) {
+  setEmblem('gem', 'good');
+  stageMsg.innerHTML = '<span class="dim">旅程结束 —— </span>' + msg;
+  const banner = $('banner');
+  banner.className = 'banner win show';
+  banner.innerHTML = '<svg class="b-gem" viewBox="-16 -16 32 32" fill="none" stroke="#7a5613" stroke-width="2" stroke-linejoin="round">'
+    + '<path d="M-6 -10 H6 L12 -2 L0 13 L-12 -2 Z" fill="#fff2c0"/><path d="M-12 -2 H12 M-6 -10 L-12 -2 L0 13 L12 -2 L6 -10"/></svg>'
+    + '<div class="b-title">寻宝成功！</div><div class="b-msg">' + msg + '</div>';
+  confetti();
+  Sound.win();
+}
+function showFail(msg) {
+  if (currentStage >= 0) { setNode(currentStage, 'fail'); }
+  setEmblem(STAGES[currentStage] ? STAGES[currentStage].icon : 'gem', 'bad');
+  const banner = $('banner');
+  banner.className = 'banner lose show';
+  banner.innerHTML = '<div class="b-title">任务失败</div><div class="b-msg">' + msg + '<br>整理行装，再试一次吧。</div>';
+  Sound.fail();
+}
+
+// ---------- 重置 ----------
+function resetUI() {
+  nodes.forEach(function (n, i) {
+    n.dataset.state = 'locked';
+    n.querySelector('.glyph').innerHTML = ICONS[STAGES[i].icon];
+  });
+  routeProg.style.strokeDashoffset = '100';
+  explorer.style.transform = 'translate(' + STAGES[0].coord[0] + 'px,' + STAGES[0].coord[1] + ')';
+  logBody.innerHTML = '<div class="log-line sys">新的探险开始，祝你好运…</div>' + cursorLine;
+  stageNo.textContent = '启程';
+  stageName.textContent = '古老图书馆';
+  stageMsg.textContent = '点击「开始寻宝」，从古老图书馆出发…';
+  setEmblem('book');
+  $('banner').className = 'banner';
+  $('banner').innerHTML = '';
+  $('rps').hidden = true;
+  $('locks').hidden = true;
+  $('confetti').innerHTML = '';
+  currentStage = -1;
+}
+
+// ---------- 主流程（async/await） ----------
+async function findTreasure() {
+  if (running) { return; }
+  running = true;
+  const my = ++runToken;
+  resetUI();
+  const startBtn = $('startBtn');
+  startBtn.disabled = true;
+  startBtn.textContent = '寻宝中…';
+  try {
+    beginStage(0, '正在图书馆的积灰书架间翻找…');
+    const clue = await MapAPI.getInitialClue();
+    if (!alive(my)) { return; }
+    log(clue); finishStage(0);
+
+    beginStage(1, '正在解读经文上的古老符号…');
+    const location = await MapAPI.decodeAncientScript(clue);
+    if (!alive(my)) { return; }
+    log(location); finishStage(1);
+
+    beginStage(2, '浓雾弥漫，只能凭指南针辨认方向…');
+    const forest = await MapAPI.crossMistyForest();
+    if (!alive(my)) { return; }
+    log(forest.msg, forest.lost ? 'warn' : 'ok');
+    finishStage(2);
+
+    beginStage(3, '河水湍急，等待老船夫撑船靠岸…');
+    const river = await MapAPI.crossRiverByBoat();
+    if (!alive(my)) { return; }
+    log(river); finishStage(3);
+
+    beginStage(4, '神殿幽深，前方似乎有什么动静…');
+    let boxMessage;
+    let guardMet = false;
+    try {
+      boxMessage = await MapAPI.searchTemple();
+    } catch (e) {
+      if (!alive(my)) { return; }
+      guardMet = true;
+      log(e.message, 'err');
+      Sound.guard();
+      finishStage(4);
+      beginStage(5, '守卫拦住去路，用猜拳决定能否通过…');
+      resetHands();
+      rpsBox.hidden = false;
+      setRounds(3);
+      boxMessage = await MapAPI.challengeGuard(my);
+    }
+    if (!alive(my)) { return; }
+    if (guardMet) {
+      log(boxMessage, 'ok');
+      rpsBox.hidden = true;
+      finishStage(5);
+    } else {
+      log(boxMessage, 'ok');
+      finishStage(4);
+      await wait(350);
+      setNode(5, 'skip');
+      travelTo(5);
+      log('守卫恰好不在岗，你放轻脚步绕过了哨位…', 'sys');
+      await wait(450);
+    }
+
+    beginStage(6, '宝箱被三道锁锁住，逐道开启…');
+    const locksBox = $('locks');
+    locksBox.hidden = false;
+    const chips = Array.from(locksBox.querySelectorAll('.lock-chip'));
+    chips.forEach(function (c) { c.classList.remove('unlocked'); });
+    const treasure = await MapAPI.openTreasureBox(my, function (name) {
+      const chip = chips.find(function (c) { return c.dataset.lock === name; });
+      if (chip) { chip.classList.add('unlocked'); }
+      Sound.lock();
+      log('咔哒！' + name + '打开了', 'warn');
+    });
+    if (!alive(my)) { return; }
+    locksBox.hidden = true;
+    finishStage(6);
+    nodes[6].querySelector('.glyph').innerHTML = ICONS.chestOpen;
+
+    beginStage(7, '宝箱缓缓开启，金光涌出…');
+    await wait(500);
+    if (!alive(my)) { return; }
+    log(treasure, 'ok');
+    finishStage(7);
+    showWin(treasure);
+  } catch (err) {
+    if (!alive(my)) { return; }
+    log('任务失败：' + err.message, 'err');
+    rpsBox.hidden = true;
+    $('locks').hidden = true;
+    showFail(err.message);
+  } finally {
+    running = false;
+    startBtn.disabled = false;
+    startBtn.textContent = '再玩一次';
+  }
+}
+
+// ---------- 控件 ----------
+$('startBtn').addEventListener('click', function () {
+  Sound.init();
+  findTreasure();
+});
+$('speed1').addEventListener('click', function () {
+  speedFactor = 1;
+  $('speed1').setAttribute('aria-pressed', 'true');
+  $('speed2').setAttribute('aria-pressed', 'false');
+});
+$('speed2').addEventListener('click', function () {
+  speedFactor = 0.45;
+  $('speed2').setAttribute('aria-pressed', 'true');
+  $('speed1').setAttribute('aria-pressed', 'false');
+});
+$('soundBtn').addEventListener('click', function () {
+  const btn = $('soundBtn');
+  Sound.init();
+  Sound.on = !Sound.on;
+  btn.setAttribute('aria-pressed', String(Sound.on));
+});
+
+// ---------- 代码语法高亮 ----------
+function highlight(src) {
+  const esc = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const re = /(\/\/[^\n]*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(async|await|class|static|extends|return|function|const|let|var|if|else|try|catch|throw|new|for|while|of|in|this|true|false|null|undefined)\b|(\b\d+(?:\.\d+)?\b)/g;
+  return esc.replace(re, function (m, com, str, kw, num) {
+    if (com) { return '<span class="tk-com">' + com + '</span>'; }
+    if (str) { return '<span class="tk-str">' + str + '</span>'; }
+    if (kw) { return '<span class="tk-kw">' + kw + '</span>'; }
+    if (num) { return '<span class="tk-num">' + num + '</span>'; }
+    return m;
+  });
+}
+$('codeOut').innerHTML = highlight($('asyncSrc').textContent.trim());
+
+// 初始驿站徽章
+setEmblem('book');
+</script>
+</div>
+</body>
+</html>
